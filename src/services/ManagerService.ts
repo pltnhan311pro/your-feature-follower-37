@@ -46,13 +46,13 @@ export interface PendingRequest {
 
 export class ManagerService {
   // Get team members for a manager
-  static getTeamMembers(managerId: string): User[] {
-    return UserService.getByManager(managerId);
+  static async getTeamMembers(managerId: string): Promise<User[]> {
+    return await UserService.getByManager(managerId);
   }
 
   // Get team statistics
-  static getTeamStats(managerId: string): TeamStats {
-    const members = this.getTeamMembers(managerId);
+  static async getTeamStats(managerId: string): Promise<TeamStats> {
+    const members = await this.getTeamMembers(managerId);
     
     return {
       totalMembers: members.length,
@@ -63,8 +63,8 @@ export class ManagerService {
   }
 
   // Get team calendar for current week
-  static getTeamCalendar(managerId: string, date: Date = new Date()): TeamCalendarItem[] {
-    const members = this.getTeamMembers(managerId);
+  static async getTeamCalendar(managerId: string, date: Date = new Date()): Promise<TeamCalendarItem[]> {
+    const members = await this.getTeamMembers(managerId);
     const memberIds = members.map(m => m.id);
     const memberMap = new Map(members.map(m => [m.id, m.fullName]));
 
@@ -73,12 +73,14 @@ export class ManagerService {
     const days = eachDayOfInterval({ start: weekStart, end: weekEnd });
 
     // Get all leave requests for team
-    const allLeaves = LeaveService.getAll().filter(
+    const allLeavesRaw = await LeaveService.getAll();
+    const allLeaves = allLeavesRaw.filter(
       l => memberIds.includes(l.userId) && l.status === 'approved'
     );
 
     // Get all OT requests for team
-    const allOT = OvertimeService.getAll().filter(
+    const allOTRaw = await OvertimeService.getAll();
+    const allOT = allOTRaw.filter(
       ot => memberIds.includes(ot.userId) && ot.status === 'approved'
     );
 
@@ -121,8 +123,8 @@ export class ManagerService {
   }
 
   // Check for leave alerts (>50% team off same day)
-  static getLeaveAlerts(managerId: string): LeaveAlert[] {
-    const members = this.getTeamMembers(managerId);
+  static async getLeaveAlerts(managerId: string): Promise<LeaveAlert[]> {
+    const members = await this.getTeamMembers(managerId);
     const memberIds = members.map(m => m.id);
     const memberMap = new Map(members.map(m => [m.id, m.fullName]));
     const totalMembers = members.length;
@@ -130,7 +132,8 @@ export class ManagerService {
     if (totalMembers === 0) return [];
 
     // Get all pending + approved leaves
-    const allLeaves = LeaveService.getAll().filter(
+    const allLeavesRaw = await LeaveService.getAll();
+    const allLeaves = allLeavesRaw.filter(
       l => memberIds.includes(l.userId) && (l.status === 'approved' || l.status === 'pending')
     );
 
@@ -173,16 +176,18 @@ export class ManagerService {
   }
 
   // Get all pending requests (leaves + OT) for team
-  static getPendingRequests(managerId: string): PendingRequest[] {
-    const members = this.getTeamMembers(managerId);
+  static async getPendingRequests(managerId: string): Promise<PendingRequest[]> {
+    const members = await this.getTeamMembers(managerId);
     const memberIds = members.map(m => m.id);
     const memberMap = new Map(members.map(m => [m.id, m.fullName]));
 
-    const pendingLeaves = LeaveService.getPendingRequests().filter(
+    const pendingLeavesRaw = await LeaveService.getPendingRequests();
+    const pendingLeaves = pendingLeavesRaw.filter(
       l => memberIds.includes(l.userId)
     );
 
-    const pendingOT = OvertimeService.getPendingRequests().filter(
+    const pendingOTRaw = await OvertimeService.getPendingRequests();
+    const pendingOT = pendingOTRaw.filter(
       ot => memberIds.includes(ot.userId)
     );
 
@@ -232,20 +237,22 @@ export class ManagerService {
   }
 
   // Get approval history for manager
-  static getApprovalHistory(managerId: string): PendingRequest[] {
-    const approvedLeaves = LeaveService.getAll().filter(
+  static async getApprovalHistory(managerId: string): Promise<PendingRequest[]> {
+    const allLeavesRaw = await LeaveService.getAll();
+    const approvedLeaves = allLeavesRaw.filter(
       l => l.approverId === managerId && l.status !== 'pending'
     );
 
-    const approvedOT = OvertimeService.getAll().filter(
+    const allOTRaw = await OvertimeService.getAll();
+    const approvedOT = allOTRaw.filter(
       ot => ot.approverId === managerId && ot.status !== 'pending'
     );
 
     const requests: PendingRequest[] = [];
 
     // Map leaves
-    approvedLeaves.forEach(leave => {
-      const user = UserService.getById(leave.userId);
+    for (const leave of approvedLeaves) {
+      const user = await UserService.getById(leave.userId);
       requests.push({
         id: leave.id,
         userId: leave.userId,
@@ -258,11 +265,11 @@ export class ManagerService {
         createdAt: leave.updatedAt,
         original: leave,
       });
-    });
+    }
 
     // Map OT
-    approvedOT.forEach(ot => {
-      const user = UserService.getById(ot.userId);
+    for (const ot of approvedOT) {
+      const user = await UserService.getById(ot.userId);
       requests.push({
         id: ot.id,
         userId: ot.userId,
@@ -275,7 +282,7 @@ export class ManagerService {
         createdAt: ot.createdAt,
         original: ot,
       });
-    });
+    }
 
     // Sort by updatedAt/createdAt (most recent first)
     return requests.sort((a, b) => 
