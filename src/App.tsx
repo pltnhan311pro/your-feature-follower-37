@@ -11,6 +11,10 @@ import Leave from "./pages/Leave";
 import Payroll from "./pages/Payroll";
 import Overtime from "./pages/Overtime";
 import Benefits from "./pages/Benefits";
+import ManagerDashboard from "./pages/ManagerDashboard";
+import PendingApprovals from "./pages/PendingApprovals";
+import ApprovalHistory from "./pages/ApprovalHistory";
+import TeamMembers from "./pages/TeamMembers";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -29,6 +33,24 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function ManagerRoute({ children }: { children: React.ReactNode }) {
+  const { user, isLoading } = useAuth();
+  
+  if (isLoading) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  }
+  
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  if (user.role !== 'manager' && user.role !== 'admin') {
+    return <Navigate to="/" replace />;
+  }
+  
+  return <>{children}</>;
+}
+
 function AppRoutes() {
   const { user } = useAuth();
   
@@ -41,6 +63,11 @@ function AppRoutes() {
       <Route path="/payroll" element={<ProtectedRoute><Payroll /></ProtectedRoute>} />
       <Route path="/overtime" element={<ProtectedRoute><Overtime /></ProtectedRoute>} />
       <Route path="/benefits" element={<ProtectedRoute><Benefits /></ProtectedRoute>} />
+      {/* Manager Routes */}
+      <Route path="/manager" element={<ManagerRoute><ManagerDashboard /></ManagerRoute>} />
+      <Route path="/manager/approvals" element={<ManagerRoute><PendingApprovals /></ManagerRoute>} />
+      <Route path="/manager/history" element={<ManagerRoute><ApprovalHistory /></ManagerRoute>} />
+      <Route path="/manager/team" element={<ManagerRoute><TeamMembers /></ManagerRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

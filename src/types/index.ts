@@ -1,6 +1,7 @@
 // Core types for the HR Portal
 
 export type UserRole = 'employee' | 'manager' | 'admin';
+export type UserStatus = 'active' | 'inactive' | 'probation';
 
 export interface User {
   id: string;
@@ -18,7 +19,7 @@ export interface User {
   managerId?: string;
   managerName?: string;
   baseSalary: number;
-  status: 'active' | 'inactive';
+  status: UserStatus;
   idNumber: string; // CMND/CCCD
 }
 
@@ -45,6 +46,8 @@ export interface LeaveRequest {
   status: LeaveStatus;
   approverId?: string;
   approverName?: string;
+  approvedAt?: string;
+  rejectReason?: string;
   createdAt: string;
   updatedAt: string;
   daysCount: number;
@@ -76,7 +79,7 @@ export interface Notification {
   userId: string;
   title: string;
   message: string;
-  type: 'leave' | 'payroll' | 'system';
+  type: 'leave' | 'payroll' | 'system' | 'approval';
   isRead: boolean;
   createdAt: string;
   relatedId?: string;
@@ -92,6 +95,8 @@ export interface OvertimeRequest {
   status: LeaveStatus;
   approverId?: string;
   approverName?: string;
+  approvedAt?: string;
+  rejectReason?: string;
   createdAt: string;
   hoursCount: number;
 }
