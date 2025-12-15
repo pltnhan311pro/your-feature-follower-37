@@ -3,7 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { User } from '@/types';
+import { User, Payslip, LeaveBalance } from '@/types';
 import { HRService, EmployeeHistoryEntry } from '@/services/HRService';
 import { UserService } from '@/services/UserService';
 import { PayslipService } from '@/services/PayslipService';
@@ -17,11 +17,21 @@ interface EmployeeDetailProps {
 
 export function EmployeeDetail({ employee }: EmployeeDetailProps) {
   const [history, setHistory] = useState<EmployeeHistoryEntry[]>([]);
-  const [leaveBalance, setLeaveBalance] = useState<any>(null);
+  const [leaveBalance, setLeaveBalance] = useState<LeaveBalance | null>(null);
+  const [payslips, setPayslips] = useState<Payslip[]>([]);
 
   useEffect(() => {
-    setHistory(HRService.getEmployeeHistory(employee.id));
-    setLeaveBalance(UserService.getLeaveBalance(employee.id));
+    const loadData = async () => {
+      const [historyData, balanceData, payslipData] = await Promise.all([
+        HRService.getEmployeeHistory(employee.id),
+        UserService.getLeaveBalance(employee.id),
+        PayslipService.getByUserId(employee.id),
+      ]);
+      setHistory(historyData);
+      setLeaveBalance(balanceData);
+      setPayslips(payslipData.slice(0, 3));
+    };
+    loadData();
   }, [employee.id]);
 
   const getInitials = (name: string) => {
@@ -50,8 +60,6 @@ export function EmployeeDetail({ employee }: EmployeeDetailProps) {
       default: return <FileText className="h-4 w-4" />;
     }
   };
-
-  const payslips = PayslipService.getByUserId(employee.id).slice(0, 3);
 
   return (
     <Tabs defaultValue="info" className="w-full">

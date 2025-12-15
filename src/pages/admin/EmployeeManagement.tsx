@@ -20,6 +20,7 @@ export default function EmployeeManagement() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [employees, setEmployees] = useState<User[]>([]);
+  const [departments, setDepartments] = useState<string[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -35,40 +36,45 @@ export default function EmployeeManagement() {
     departmentStats: [] as { name: string; count: number }[],
   });
 
-  const loadData = () => {
+  const loadData = async () => {
     const filters: { department?: string; status?: string } = {};
     if (departmentFilter !== 'all') filters.department = departmentFilter;
     if (statusFilter !== 'all') filters.status = statusFilter;
 
-    const data = HRService.searchEmployees(searchQuery, filters);
+    const [data, hrStats, allEmployees] = await Promise.all([
+      HRService.searchEmployees(searchQuery, filters),
+      HRService.getHRStats(),
+      HRService.getAllEmployees(),
+    ]);
     setEmployees(data);
-    setStats(HRService.getHRStats());
+    setStats(hrStats);
+    setDepartments([...new Set(allEmployees.map(e => e.department))]);
   };
 
   useEffect(() => {
     loadData();
   }, [searchQuery, departmentFilter, statusFilter]);
 
-  const handleCreateEmployee = (data: Omit<User, 'id' | 'employeeId'>) => {
+  const handleCreateEmployee = async (data: Omit<User, 'id' | 'employeeId'>) => {
     if (!user) return;
-    HRService.createEmployee(data, { id: user.id, name: user.fullName });
+    await HRService.createEmployee(data, { id: user.id, name: user.fullName });
     toast({ title: 'Thành công', description: 'Đã tạo hồ sơ nhân viên mới' });
     setIsFormOpen(false);
     loadData();
   };
 
-  const handleUpdateEmployee = (data: Partial<User>) => {
+  const handleUpdateEmployee = async (data: Partial<User>) => {
     if (!user || !editingEmployee) return;
-    HRService.updateEmployee(editingEmployee.id, data, { id: user.id, name: user.fullName });
+    await HRService.updateEmployee(editingEmployee.id, data, { id: user.id, name: user.fullName });
     toast({ title: 'Thành công', description: 'Đã cập nhật hồ sơ nhân viên' });
     setEditingEmployee(null);
     setIsFormOpen(false);
     loadData();
   };
 
-  const handleDeleteEmployee = (employee: User) => {
+  const handleDeleteEmployee = async (employee: User) => {
     if (!user) return;
-    HRService.softDeleteEmployee(employee.id, { id: user.id, name: user.fullName });
+    await HRService.softDeleteEmployee(employee.id, { id: user.id, name: user.fullName });
     toast({ title: 'Thành công', description: 'Đã đánh dấu nhân viên nghỉ việc' });
     loadData();
   };
@@ -85,8 +91,6 @@ export default function EmployeeManagement() {
         return <Badge variant="outline">{status}</Badge>;
     }
   };
-
-  const departments = [...new Set(HRService.getAllEmployees().map(e => e.department))];
 
   return (
     <MainLayout title="Quản lý nhân viên" breadcrumbs={[{ label: 'HR Admin' }, { label: 'Nhân viên' }]}>

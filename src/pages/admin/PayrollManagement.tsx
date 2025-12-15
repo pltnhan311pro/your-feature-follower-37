@@ -13,7 +13,7 @@ import { useToast } from '@/hooks/use-toast';
 import { HRService, PayrollConfig, PayrollRun } from '@/services/HRService';
 import { PayslipService } from '@/services/PayslipService';
 import { useAuth } from '@/contexts/AuthContext';
-import { Payslip } from '@/types';
+import { Payslip, User } from '@/types';
 import { Play, Settings, Download, Calculator, DollarSign, Users, FileText, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { vi } from 'date-fns/locale';
@@ -22,11 +22,11 @@ export default function PayrollManagement() {
   const { user } = useAuth();
   const { toast } = useToast();
   const [payrollRuns, setPayrollRuns] = useState<PayrollRun[]>([]);
+  const [allEmployees, setAllEmployees] = useState<User[]>([]);
   const [config, setConfig] = useState<PayrollConfig | null>(null);
   const [selectedPeriod, setSelectedPeriod] = useState<string>('');
   const [payslips, setPayslips] = useState<Payslip[]>([]);
   const [isRunning, setIsRunning] = useState(false);
-  const [isConfigOpen, setIsConfigOpen] = useState(false);
   const [configForm, setConfigForm] = useState<Partial<PayrollConfig>>({});
 
   // Generate periods for last 12 months
@@ -39,11 +39,16 @@ export default function PayrollManagement() {
     };
   });
 
-  const loadData = () => {
-    setPayrollRuns(HRService.getPayrollRuns());
-    const cfg = HRService.getPayrollConfig();
+  const loadData = async () => {
+    const [runs, cfg, employees] = await Promise.all([
+      HRService.getPayrollRuns(),
+      HRService.getPayrollConfig(),
+      HRService.getAllEmployees(),
+    ]);
+    setPayrollRuns(runs);
     setConfig(cfg);
     setConfigForm(cfg);
+    setAllEmployees(employees);
   };
 
   useEffect(() => {
@@ -54,10 +59,13 @@ export default function PayrollManagement() {
   }, []);
 
   useEffect(() => {
-    if (selectedPeriod) {
-      const allPayslips = PayslipService.getAll().filter(p => p.period === selectedPeriod);
-      setPayslips(allPayslips);
-    }
+    const loadPayslips = async () => {
+      if (selectedPeriod) {
+        const allPayslips = await PayslipService.getAll();
+        setPayslips(allPayslips.filter(p => p.period === selectedPeriod));
+      }
+    };
+    loadPayslips();
   }, [selectedPeriod, payrollRuns]);
 
   const handleRunPayroll = async () => {
@@ -67,7 +75,7 @@ export default function PayrollManagement() {
     // Simulate processing time
     await new Promise(resolve => setTimeout(resolve, 1500));
     
-    const result = HRService.runPayroll(selectedPeriod, { id: user.id, name: user.fullName });
+    const result = await HRService.runPayroll(selectedPeriod, { id: user.id, name: user.fullName });
     
     toast({
       title: 'Tính lương hoàn tất',
@@ -78,18 +86,17 @@ export default function PayrollManagement() {
     loadData();
   };
 
-  const handleSaveConfig = () => {
+  const handleSaveConfig = async () => {
     if (!user) return;
-    HRService.updatePayrollConfig(configForm, user.fullName);
+    await HRService.updatePayrollConfig(configForm, user.fullName);
     toast({ title: 'Thành công', description: 'Đã cập nhật cấu hình tính lương' });
-    setIsConfigOpen(false);
     loadData();
   };
 
-  const handleExportBank = (bankFormat: 'ACB' | 'VCB') => {
+  const handleExportBank = async (bankFormat: 'ACB' | 'VCB') => {
     if (!selectedPeriod) return;
     
-    const content = HRService.exportBankFile(selectedPeriod, bankFormat);
+    const content = await HRService.exportBankFile(selectedPeriod, bankFormat);
     const blob = new Blob([content], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -262,7 +269,7 @@ export default function PayrollManagement() {
                   </TableHeader>
                   <TableBody>
                     {payslips.map((payslip) => {
-                      const employee = HRService.getAllEmployees().find(e => e.id === payslip.userId);
+                      const employee = allEmployees.find(e => e.id === payslip.userId);
                       return (
                         <TableRow key={payslip.id}>
                           <TableCell>
@@ -396,7 +403,7 @@ export default function PayrollManagement() {
                     value={configForm.personalDeduction || ''}
                     onChange={(e) => setConfigForm({ ...configForm, personalDeduction: Number(e.target.value) })}
                   />
-                  <p className="text-xs text-muted-foreground">Mặc định: 11,000,000 đ</p>
+                  <p className="text-xs text-muted-foreground">Mặc định: 11.000.000 đ</p>
                 </div>
 
                 <div className="space-y-2">
@@ -406,19 +413,15 @@ export default function PayrollManagement() {
                     value={configForm.dependentDeduction || ''}
                     onChange={(e) => setConfigForm({ ...configForm, dependentDeduction: Number(e.target.value) })}
                   />
-                  <p className="text-xs text-muted-foreground">Mặc định: 4,400,000 đ/người</p>
+                  <p className="text-xs text-muted-foreground">Mặc định: 4.400.000 đ / người</p>
                 </div>
               </div>
 
-              {config && (
-                <p className="text-xs text-muted-foreground">
-                  Cập nhật lần cuối: {format(new Date(config.updatedAt), 'dd/MM/yyyy HH:mm', { locale: vi })} bởi {config.updatedBy}
-                </p>
-              )}
-
-              <Button onClick={handleSaveConfig}>
-                Lưu cấu hình
-              </Button>
+              <div className="flex justify-end pt-4 border-t">
+                <Button onClick={handleSaveConfig}>
+                  Lưu cấu hình
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

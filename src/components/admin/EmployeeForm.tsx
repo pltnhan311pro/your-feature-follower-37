@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -30,15 +30,19 @@ export function EmployeeForm({ employee, onSubmit, onCancel }: EmployeeFormProps
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [managers, setManagers] = useState<User[]>([]);
 
-  // Memoize managers to prevent unnecessary re-renders
-  const managers = useMemo(() => {
-    try {
-      return HRService.getAllEmployees().filter(e => e.role === 'manager' || e.role === 'admin');
-    } catch (error) {
-      console.error('Error loading managers:', error);
-      return [];
-    }
+  // Load managers on mount
+  useEffect(() => {
+    const loadManagers = async () => {
+      try {
+        const allEmployees = await HRService.getAllEmployees();
+        setManagers(allEmployees.filter(e => e.role === 'manager' || e.role === 'admin'));
+      } catch (error) {
+        console.error('Error loading managers:', error);
+      }
+    };
+    loadManagers();
   }, []);
 
   const departments = [

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { HRService } from '@/services/HRService';
 import { LeaveService } from '@/services/LeaveService';
@@ -9,9 +9,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Link } from 'react-router-dom';
 import { 
   Users, UserCheck, UserX, Clock, 
-  FileText, DollarSign, Calendar, 
-  ArrowRight, ClipboardCheck, Building,
-  TrendingUp
+  Calendar, 
+  ArrowRight, ClipboardCheck, Building
 } from 'lucide-react';
 
 export default function HRDashboard() {
@@ -27,14 +26,22 @@ export default function HRDashboard() {
   const [pendingOTs, setPendingOTs] = useState(0);
 
   useEffect(() => {
-    setStats(HRService.getHRStats());
-    setPendingLeaves(LeaveService.getPendingRequests().length);
-    setPendingOTs(OvertimeService.getPendingRequests().length);
+    const loadData = async () => {
+      const [hrStats, leaves, ots] = await Promise.all([
+        HRService.getHRStats(),
+        LeaveService.getPendingRequests(),
+        OvertimeService.getPendingRequests(),
+      ]);
+      setStats(hrStats);
+      setPendingLeaves(leaves.length);
+      setPendingOTs(ots.length);
+    };
+    loadData();
   }, []);
 
   const quickActions = [
     { label: 'Quản lý nhân viên', icon: Users, path: '/admin/employees', color: 'bg-primary/10 text-primary' },
-    { label: 'Tính lương', icon: DollarSign, path: '/admin/payroll', color: 'bg-success/10 text-success' },
+    { label: 'Tính lương', icon: Clock, path: '/admin/payroll', color: 'bg-success/10 text-success' },
     { label: 'Duyệt đơn', icon: ClipboardCheck, path: '/manager/approvals', color: 'bg-warning/10 text-warning' },
     { label: 'Xem team', icon: Building, path: '/manager/team', color: 'bg-info/10 text-info' },
   ];
