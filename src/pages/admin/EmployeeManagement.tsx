@@ -89,7 +89,7 @@ export default function EmployeeManagement() {
   const departments = [...new Set(HRService.getAllEmployees().map(e => e.department))];
 
   return (
-    <MainLayout title="Quản lý nhân viên" breadcrumb="HR Admin / Nhân viên">
+    <MainLayout title="Quản lý nhân viên" breadcrumbs={[{ label: 'HR Admin' }, { label: 'Nhân viên' }]}>
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <Card>

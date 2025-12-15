@@ -40,7 +40,7 @@ export default function HRDashboard() {
   ];
 
   return (
-    <MainLayout title="HR Admin Dashboard" breadcrumb="HR Admin">
+    <MainLayout title="HR Admin Dashboard" breadcrumbs={[{ label: 'HR Admin' }]}>
       {/* Welcome Banner */}
       <Card className="mb-6 bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20">
         <CardContent className="p-6">

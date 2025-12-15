@@ -117,7 +117,7 @@ export default function PayrollManagement() {
   };
 
   return (
-    <MainLayout title="Quản lý tính lương" breadcrumb="HR Admin / Tính lương">
+    <MainLayout title="Quản lý tính lương" breadcrumbs={[{ label: 'HR Admin' }, { label: 'Tính lương' }]}>
       <Tabs defaultValue="run" className="space-y-6">
         <TabsList>
           <TabsTrigger value="run">Chạy tính lương</TabsTrigger>
