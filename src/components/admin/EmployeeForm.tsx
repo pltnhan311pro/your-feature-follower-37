@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,24 +14,33 @@ interface EmployeeFormProps {
 
 export function EmployeeForm({ employee, onSubmit, onCancel }: EmployeeFormProps) {
   const [formData, setFormData] = useState({
-    fullName: employee?.fullName || '',
-    email: employee?.email || '',
-    phone: employee?.phone || '',
-    idNumber: employee?.idNumber || '',
-    department: employee?.department || '',
-    position: employee?.position || '',
-    location: employee?.location || 'Hồ Chí Minh, VN',
-    startDate: employee?.startDate || new Date().toISOString().split('T')[0],
-    contractType: employee?.contractType || 'Toàn thời gian (Không xác định thời hạn)',
-    baseSalary: employee?.baseSalary || 0,
-    role: employee?.role || 'employee' as UserRole,
-    status: employee?.status || 'active' as UserStatus,
-    managerId: employee?.managerId || '',
+    fullName: '',
+    email: '',
+    phone: '',
+    idNumber: '',
+    department: '',
+    position: '',
+    location: 'Hồ Chí Minh, VN',
+    startDate: new Date().toISOString().split('T')[0],
+    contractType: 'Toàn thời gian (Không xác định thời hạn)',
+    baseSalary: 0,
+    role: 'employee' as UserRole,
+    status: 'active' as UserStatus,
+    managerId: '',
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const managers = HRService.getAllEmployees().filter(e => e.role === 'manager' || e.role === 'admin');
+  // Memoize managers to prevent unnecessary re-renders
+  const managers = useMemo(() => {
+    try {
+      return HRService.getAllEmployees().filter(e => e.role === 'manager' || e.role === 'admin');
+    } catch (error) {
+      console.error('Error loading managers:', error);
+      return [];
+    }
+  }, []);
+
   const departments = [
     'Phát triển sản phẩm (Product)',
     'Nhân sự (HR)',
@@ -48,6 +57,44 @@ export function EmployeeForm({ employee, onSubmit, onCancel }: EmployeeFormProps
     'Thử việc',
     'Hợp đồng dịch vụ',
   ];
+
+  // Reset form when employee changes
+  useEffect(() => {
+    if (employee) {
+      setFormData({
+        fullName: employee.fullName || '',
+        email: employee.email || '',
+        phone: employee.phone || '',
+        idNumber: employee.idNumber || '',
+        department: employee.department || '',
+        position: employee.position || '',
+        location: employee.location || 'Hồ Chí Minh, VN',
+        startDate: employee.startDate || new Date().toISOString().split('T')[0],
+        contractType: employee.contractType || 'Toàn thời gian (Không xác định thời hạn)',
+        baseSalary: employee.baseSalary || 0,
+        role: employee.role || 'employee',
+        status: employee.status || 'active',
+        managerId: employee.managerId || '',
+      });
+    } else {
+      setFormData({
+        fullName: '',
+        email: '',
+        phone: '',
+        idNumber: '',
+        department: '',
+        position: '',
+        location: 'Hồ Chí Minh, VN',
+        startDate: new Date().toISOString().split('T')[0],
+        contractType: 'Toàn thời gian (Không xác định thời hạn)',
+        baseSalary: 0,
+        role: 'employee',
+        status: 'active',
+        managerId: '',
+      });
+    }
+    setErrors({});
+  }, [employee]);
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
@@ -244,12 +291,12 @@ export function EmployeeForm({ employee, onSubmit, onCancel }: EmployeeFormProps
         {/* Manager */}
         <div className="space-y-2">
           <Label>Quản lý trực tiếp</Label>
-          <Select value={formData.managerId} onValueChange={(value) => setFormData({ ...formData, managerId: value })}>
+          <Select value={formData.managerId || 'none'} onValueChange={(value) => setFormData({ ...formData, managerId: value === 'none' ? '' : value })}>
             <SelectTrigger>
               <SelectValue placeholder="Chọn quản lý" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="">Không có</SelectItem>
+              <SelectItem value="none">Không có</SelectItem>
               {managers.map(manager => (
                 <SelectItem key={manager.id} value={manager.id}>{manager.fullName}</SelectItem>
               ))}

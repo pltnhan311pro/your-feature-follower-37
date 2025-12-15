@@ -25,11 +25,24 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { 
   Calendar, 
   Plus, 
   Clock,
-  AlertTriangle
+  AlertTriangle,
+  Edit,
+  Trash2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { LeaveRequest, LeaveType } from '@/types';
@@ -37,6 +50,8 @@ import { LeaveRequest, LeaveType } from '@/types';
 export default function Leave() {
   const { user } = useAuth();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingRequest, setEditingRequest] = useState<LeaveRequest | null>(null);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [leaveType, setLeaveType] = useState<LeaveType>('annual');
@@ -54,6 +69,14 @@ export default function Leave() {
   const remainingSick = leaveBalance 
     ? leaveBalance.sickTotal - leaveBalance.sickUsed 
     : 0;
+
+  const resetForm = () => {
+    setStartDate('');
+    setEndDate('');
+    setLeaveType('annual');
+    setReason('');
+    setEditingRequest(null);
+  };
 
   const handleSubmit = () => {
     if (!startDate || !endDate || !reason) {
@@ -87,11 +110,51 @@ export default function Leave() {
 
     setLeaveRequests(LeaveService.getByUserId(user.id));
     setIsDialogOpen(false);
-    setStartDate('');
-    setEndDate('');
-    setLeaveType('annual');
-    setReason('');
+    resetForm();
     toast.success('Đã gửi đơn xin nghỉ phép');
+  };
+
+  const handleEdit = (request: LeaveRequest) => {
+    setEditingRequest(request);
+    setStartDate(request.startDate);
+    setEndDate(request.endDate);
+    setLeaveType(request.leaveType);
+    setReason(request.reason);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleUpdateSubmit = () => {
+    if (!editingRequest) return;
+    if (!startDate || !endDate || !reason) {
+      toast.error('Vui lòng điền đầy đủ thông tin');
+      return;
+    }
+
+    if (new Date(startDate) > new Date(endDate)) {
+      toast.error('Ngày bắt đầu phải trước ngày kết thúc');
+      return;
+    }
+
+    const daysCount = LeaveService.calculateDays(startDate, endDate);
+    
+    LeaveService.update(editingRequest.id, {
+      startDate,
+      endDate,
+      leaveType,
+      reason,
+      daysCount,
+    });
+
+    setLeaveRequests(LeaveService.getByUserId(user.id));
+    setIsEditDialogOpen(false);
+    resetForm();
+    toast.success('Đã cập nhật đơn nghỉ phép');
+  };
+
+  const handleDelete = (requestId: string) => {
+    LeaveService.delete(requestId);
+    setLeaveRequests(LeaveService.getByUserId(user.id));
+    toast.success('Đã xóa đơn nghỉ phép');
   };
 
   const getStatusBadge = (status: LeaveRequest['status']) => {
@@ -247,7 +310,7 @@ export default function Leave() {
                   </div>
                 </div>
                 <DialogFooter>
-                  <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+                  <Button variant="outline" onClick={() => { setIsDialogOpen(false); resetForm(); }}>
                     Hủy
                   </Button>
                   <Button onClick={handleSubmit}>
@@ -269,6 +332,7 @@ export default function Leave() {
                       <th className="pb-3 text-sm font-medium text-muted-foreground">LÝ DO</th>
                       <th className="pb-3 text-sm font-medium text-muted-foreground">TRẠNG THÁI</th>
                       <th className="pb-3 text-sm font-medium text-muted-foreground">NGƯỜI DUYỆT</th>
+                      <th className="pb-3 text-sm font-medium text-muted-foreground">THAO TÁC</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -301,6 +365,46 @@ export default function Leave() {
                         <td className="py-4 text-sm text-muted-foreground">
                           {request.approverName || '--'}
                         </td>
+                        <td className="py-4">
+                          {request.status === 'pending' && (
+                            <div className="flex gap-2">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleEdit(request)}
+                                title="Sửa"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="text-destructive hover:text-destructive"
+                                    title="Xóa"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Xác nhận xóa</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Bạn có chắc muốn xóa đơn nghỉ phép này? Hành động này không thể hoàn tác.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Hủy</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => handleDelete(request.id)}>
+                                      Xóa
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -321,6 +425,71 @@ export default function Leave() {
             )}
           </CardContent>
         </Card>
+
+        {/* Edit Dialog */}
+        <Dialog open={isEditDialogOpen} onOpenChange={(open) => { setIsEditDialogOpen(open); if (!open) resetForm(); }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Sửa đơn nghỉ phép</DialogTitle>
+              <DialogDescription>
+                Cập nhật thông tin đơn xin nghỉ phép
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="editStartDate">Từ ngày</Label>
+                  <Input
+                    id="editStartDate"
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="editEndDate">Đến ngày</Label>
+                  <Input
+                    id="editEndDate"
+                    type="date"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="editLeaveType">Loại nghỉ phép</Label>
+                <Select value={leaveType} onValueChange={(v) => setLeaveType(v as LeaveType)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="annual">Phép năm ({remainingAnnual} ngày còn lại)</SelectItem>
+                    <SelectItem value="sick">Nghỉ ốm ({remainingSick} ngày còn lại)</SelectItem>
+                    <SelectItem value="unpaid">Không lương</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="editReason">Lý do nghỉ</Label>
+                <Textarea
+                  id="editReason"
+                  placeholder="Nhập lý do xin nghỉ phép..."
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  rows={3}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => { setIsEditDialogOpen(false); resetForm(); }}>
+                Hủy
+              </Button>
+              <Button onClick={handleUpdateSubmit}>
+                Cập nhật
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </MainLayout>
   );

@@ -19,6 +19,11 @@ export class UserService {
     return users[0] || null;
   }
 
+  static getByEmail(email: string): User | null {
+    const users = StorageService.findByField<User>(USERS_KEY, 'email', email);
+    return users[0] || null;
+  }
+
   static create(user: User): User {
     StorageService.addItem(USERS_KEY, user);
     // Initialize leave balance for new user

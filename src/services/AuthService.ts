@@ -10,12 +10,17 @@ export class AuthService {
     return StorageService.get<User>(CURRENT_USER_KEY);
   }
 
-  static login(employeeId: string, password: string): User | null {
+  static login(identifier: string, password: string): User | null {
     // In a real app, this would validate against a backend
-    // For now, we just find the user by employeeId
-    const user = UserService.getByEmployeeId(employeeId);
+    // Support login by employeeId or email
+    let user = UserService.getByEmployeeId(identifier);
     
-    if (user && password === '123456') { // Simple password for demo
+    // If not found by employeeId, try by email
+    if (!user) {
+      user = UserService.getByEmail(identifier);
+    }
+    
+    if (user && user.status !== 'inactive' && password === '123456') { // Simple password for demo
       StorageService.set(CURRENT_USER_KEY, user);
       return user;
     }

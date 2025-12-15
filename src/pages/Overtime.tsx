@@ -16,28 +16,35 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { Clock, Plus, Calendar } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { Clock, Plus, Calendar, Edit, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { OvertimeRequest } from '@/types';
-import { StorageService } from '@/services/StorageService';
-
-const OT_REQUESTS_KEY = 'overtime_requests';
+import { OvertimeService } from '@/services/OvertimeService';
 
 export default function Overtime() {
   const { user } = useAuth();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingRequest, setEditingRequest] = useState<OvertimeRequest | null>(null);
   const [date, setDate] = useState('');
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
   const [reason, setReason] = useState('');
   
-  const getOTRequests = (): OvertimeRequest[] => {
-    if (!user) return [];
-    const all = StorageService.getAll<OvertimeRequest>(OT_REQUESTS_KEY);
-    return all.filter(r => r.userId === user.id);
-  };
-
-  const [otRequests, setOtRequests] = useState<OvertimeRequest[]>(getOTRequests());
+  const [otRequests, setOtRequests] = useState<OvertimeRequest[]>(
+    user ? OvertimeService.getByUserId(user.id) : []
+  );
 
   if (!user) return null;
 
@@ -47,6 +54,14 @@ export default function Overtime() {
     const startMinutes = startH * 60 + startM;
     const endMinutes = endH * 60 + endM;
     return Math.max(0, (endMinutes - startMinutes) / 60);
+  };
+
+  const resetForm = () => {
+    setDate('');
+    setStartTime('');
+    setEndTime('');
+    setReason('');
+    setEditingRequest(null);
   };
 
   const handleSubmit = () => {
@@ -61,26 +76,65 @@ export default function Overtime() {
       return;
     }
 
-    const otRequest: OvertimeRequest = {
-      id: crypto.randomUUID(),
+    const result = OvertimeService.create({
       userId: user.id,
       date,
       startTime,
       endTime,
       reason,
-      status: 'pending',
-      createdAt: new Date().toISOString(),
-      hoursCount: hours,
-    };
+    });
 
-    StorageService.addItem(OT_REQUESTS_KEY, otRequest);
-    setOtRequests(getOTRequests());
+    if ('error' in result) {
+      toast.error(result.error);
+      return;
+    }
+
+    setOtRequests(OvertimeService.getByUserId(user.id));
     setIsDialogOpen(false);
-    setDate('');
-    setStartTime('');
-    setEndTime('');
-    setReason('');
+    resetForm();
     toast.success('Đã gửi đơn đăng ký OT');
+  };
+
+  const handleEdit = (request: OvertimeRequest) => {
+    setEditingRequest(request);
+    setDate(request.date);
+    setStartTime(request.startTime);
+    setEndTime(request.endTime);
+    setReason(request.reason);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleUpdateSubmit = () => {
+    if (!editingRequest) return;
+    if (!date || !startTime || !endTime || !reason) {
+      toast.error('Vui lòng điền đầy đủ thông tin');
+      return;
+    }
+
+    const hours = calculateHours(startTime, endTime);
+    if (hours <= 0) {
+      toast.error('Giờ kết thúc phải sau giờ bắt đầu');
+      return;
+    }
+
+    OvertimeService.update(editingRequest.id, {
+      date,
+      startTime,
+      endTime,
+      reason,
+      hoursCount: hours,
+    });
+
+    setOtRequests(OvertimeService.getByUserId(user.id));
+    setIsEditDialogOpen(false);
+    resetForm();
+    toast.success('Đã cập nhật đơn OT');
+  };
+
+  const handleDelete = (requestId: string) => {
+    OvertimeService.delete(requestId);
+    setOtRequests(OvertimeService.getByUserId(user.id));
+    toast.success('Đã xóa đơn OT');
   };
 
   const totalHoursThisMonth = otRequests
@@ -206,7 +260,7 @@ export default function Overtime() {
                   </div>
                 </div>
                 <DialogFooter>
-                  <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+                  <Button variant="outline" onClick={() => { setIsDialogOpen(false); resetForm(); }}>
                     Hủy
                   </Button>
                   <Button onClick={handleSubmit}>
@@ -227,6 +281,7 @@ export default function Overtime() {
                       <th className="pb-3 text-sm font-medium text-muted-foreground">SỐ GIỜ</th>
                       <th className="pb-3 text-sm font-medium text-muted-foreground">LÝ DO</th>
                       <th className="pb-3 text-sm font-medium text-muted-foreground">TRẠNG THÁI</th>
+                      <th className="pb-3 text-sm font-medium text-muted-foreground">THAO TÁC</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y">
@@ -263,6 +318,46 @@ export default function Overtime() {
                             {request.status === 'approved' ? 'Đã duyệt' : request.status === 'pending' ? 'Chờ duyệt' : 'Từ chối'}
                           </Badge>
                         </td>
+                        <td className="py-4">
+                          {request.status === 'pending' && (
+                            <div className="flex gap-2">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleEdit(request)}
+                                title="Sửa"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="text-destructive hover:text-destructive"
+                                    title="Xóa"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Xác nhận xóa</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Bạn có chắc muốn xóa đơn OT này? Hành động này không thể hoàn tác.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Hủy</AlertDialogCancel>
+                                    <AlertDialogAction onClick={() => handleDelete(request.id)}>
+                                      Xóa
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </div>
+                          )}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -283,6 +378,72 @@ export default function Overtime() {
             )}
           </CardContent>
         </Card>
+
+        {/* Edit Dialog */}
+        <Dialog open={isEditDialogOpen} onOpenChange={(open) => { setIsEditDialogOpen(open); if (!open) resetForm(); }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Sửa đơn OT</DialogTitle>
+              <DialogDescription>
+                Cập nhật thông tin đơn đăng ký OT
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="editDate">Ngày OT</Label>
+                <Input
+                  id="editDate"
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="editStartTime">Giờ bắt đầu</Label>
+                  <Input
+                    id="editStartTime"
+                    type="time"
+                    value={startTime}
+                    onChange={(e) => setStartTime(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="editEndTime">Giờ kết thúc</Label>
+                  <Input
+                    id="editEndTime"
+                    type="time"
+                    value={endTime}
+                    onChange={(e) => setEndTime(e.target.value)}
+                  />
+                </div>
+              </div>
+              {startTime && endTime && (
+                <p className="text-sm text-muted-foreground">
+                  Tổng thời gian: {calculateHours(startTime, endTime).toFixed(1)} giờ
+                </p>
+              )}
+              <div className="space-y-2">
+                <Label htmlFor="editReason">Lý do OT</Label>
+                <Textarea
+                  id="editReason"
+                  placeholder="Nhập lý do làm thêm giờ..."
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  rows={3}
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => { setIsEditDialogOpen(false); resetForm(); }}>
+                Hủy
+              </Button>
+              <Button onClick={handleUpdateSubmit}>
+                Cập nhật
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </MainLayout>
   );
