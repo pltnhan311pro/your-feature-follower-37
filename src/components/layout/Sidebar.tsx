@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom';
-import { Home, User, Calendar, Gift, Clock, FileText, Settings, LogOut, CheckCircle } from 'lucide-react';
+import { Home, User, Calendar, Gift, Clock, FileText, Settings, LogOut, CheckCircle, Users, History, ClipboardCheck } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -11,6 +11,13 @@ const menuItems = [
   { path: '/payroll', icon: FileText, label: 'Bảng lương' },
   { path: '/overtime', icon: Clock, label: 'Làm thêm giờ' },
   { path: '/benefits', icon: Gift, label: 'Phúc lợi' },
+];
+
+const managerMenuItems = [
+  { path: '/manager', icon: Users, label: 'Manager Dashboard' },
+  { path: '/manager/approvals', icon: ClipboardCheck, label: 'Duyệt đơn' },
+  { path: '/manager/history', icon: History, label: 'Lịch sử duyệt' },
+  { path: '/manager/team', icon: Users, label: 'Danh sách team' },
 ];
 
 export function Sidebar() {
@@ -38,7 +45,7 @@ export function Sidebar() {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 space-y-1 px-3 py-4">
+        <nav className="flex-1 space-y-1 px-3 py-4 overflow-y-auto">
           <p className="mb-2 px-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
             Menu chính
           </p>
@@ -60,6 +67,33 @@ export function Sidebar() {
               </NavLink>
             );
           })}
+
+          {/* Manager Menu */}
+          {user && (user.role === 'manager' || user.role === 'admin') && (
+            <>
+              <p className="mt-6 mb-2 px-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                Quản lý
+              </p>
+              {managerMenuItems.map((item) => {
+                const isActive = location.pathname === item.path;
+                return (
+                  <NavLink
+                    key={item.path}
+                    to={item.path}
+                    className={cn(
+                      'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
+                      isActive
+                        ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                        : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
+                    )}
+                  >
+                    <item.icon className={cn('h-5 w-5', isActive && 'text-primary')} />
+                    {item.label}
+                  </NavLink>
+                );
+              })}
+            </>
+          )}
         </nav>
 
         {/* User section */}

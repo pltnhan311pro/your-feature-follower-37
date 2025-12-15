@@ -1,5 +1,5 @@
 // Seed Service - initializes demo data
-import { User, LeaveBalance, LeaveRequest, Payslip, Notification } from '@/types';
+import { User, LeaveBalance, LeaveRequest, Payslip, Notification, OvertimeRequest } from '@/types';
 import { StorageService } from './StorageService';
 
 const SEEDED_KEY = 'data_seeded';
@@ -13,6 +13,7 @@ export class SeedService {
     this.seedUsers();
     this.seedLeaveBalances();
     this.seedLeaveRequests();
+    this.seedOvertimeRequests();
     this.seedPayslips();
     this.seedNotifications();
 
@@ -71,6 +72,61 @@ export class SeedService {
         status: 'active',
         idNumber: '079111222333',
       },
+      // Additional team members for manager
+      {
+        id: 'user-004',
+        employeeId: 'EMP-2022-201',
+        fullName: 'Phạm Văn D',
+        email: 'phamvand@company.com',
+        phone: '0909 111 222',
+        role: 'employee',
+        department: 'Phát triển sản phẩm (Product)',
+        position: 'Junior Developer',
+        location: 'Hồ Chí Minh, VN',
+        startDate: '2022-06-01',
+        contractType: 'Thử việc',
+        managerId: 'user-002',
+        managerName: 'Trần Thị B',
+        baseSalary: 15000000,
+        status: 'probation',
+        idNumber: '079444555666',
+      },
+      {
+        id: 'user-005',
+        employeeId: 'EMP-2021-150',
+        fullName: 'Hoàng Thị E',
+        email: 'hoangthie@company.com',
+        phone: '0909 333 444',
+        role: 'employee',
+        department: 'Phát triển sản phẩm (Product)',
+        position: 'UI/UX Designer',
+        location: 'Hồ Chí Minh, VN',
+        startDate: '2021-09-15',
+        contractType: 'Toàn thời gian (Không xác định thời hạn)',
+        managerId: 'user-002',
+        managerName: 'Trần Thị B',
+        baseSalary: 22000000,
+        status: 'active',
+        idNumber: '079777888999',
+      },
+      {
+        id: 'user-006',
+        employeeId: 'EMP-2023-300',
+        fullName: 'Vũ Văn F',
+        email: 'vuvanf@company.com',
+        phone: '0909 555 666',
+        role: 'employee',
+        department: 'Phát triển sản phẩm (Product)',
+        position: 'QA Engineer',
+        location: 'Hồ Chí Minh, VN',
+        startDate: '2023-03-01',
+        contractType: 'Toàn thời gian (Không xác định thời hạn)',
+        managerId: 'user-002',
+        managerName: 'Trần Thị B',
+        baseSalary: 18000000,
+        status: 'active',
+        idNumber: '079000111222',
+      },
     ];
 
     StorageService.set('users', users);
@@ -105,6 +161,33 @@ export class SeedService {
         sickUsed: 0,
         unpaidUsed: 0,
       },
+      {
+        id: 'balance-004',
+        userId: 'user-004',
+        annualTotal: 12,
+        annualUsed: 0,
+        sickTotal: 7,
+        sickUsed: 0,
+        unpaidUsed: 0,
+      },
+      {
+        id: 'balance-005',
+        userId: 'user-005',
+        annualTotal: 12,
+        annualUsed: 2,
+        sickTotal: 7,
+        sickUsed: 1,
+        unpaidUsed: 0,
+      },
+      {
+        id: 'balance-006',
+        userId: 'user-006',
+        annualTotal: 12,
+        annualUsed: 1,
+        sickTotal: 7,
+        sickUsed: 0,
+        unpaidUsed: 0,
+      },
     ];
 
     StorageService.set('leave_balances', balances);
@@ -122,6 +205,7 @@ export class SeedService {
         status: 'approved',
         approverId: 'user-002',
         approverName: 'Trần Thị B',
+        approvedAt: '2023-09-16T14:00:00Z',
         createdAt: '2023-09-15T10:00:00Z',
         updatedAt: '2023-09-16T14:00:00Z',
         daysCount: 3,
@@ -138,9 +222,117 @@ export class SeedService {
         updatedAt: '2023-12-10T09:00:00Z',
         daysCount: 3,
       },
+      // Pending requests for manager to approve
+      {
+        id: 'leave-003',
+        userId: 'user-004',
+        startDate: '2023-12-20',
+        endDate: '2023-12-21',
+        leaveType: 'annual',
+        reason: 'Về quê thăm gia đình',
+        status: 'pending',
+        createdAt: '2023-12-12T08:00:00Z',
+        updatedAt: '2023-12-12T08:00:00Z',
+        daysCount: 2,
+      },
+      {
+        id: 'leave-004',
+        userId: 'user-005',
+        startDate: '2023-12-22',
+        endDate: '2023-12-22',
+        leaveType: 'sick',
+        reason: 'Khám sức khỏe định kỳ',
+        status: 'pending',
+        createdAt: '2023-12-13T10:00:00Z',
+        updatedAt: '2023-12-13T10:00:00Z',
+        daysCount: 1,
+      },
+      {
+        id: 'leave-005',
+        userId: 'user-006',
+        startDate: '2023-12-20',
+        endDate: '2023-12-22',
+        leaveType: 'annual',
+        reason: 'Nghỉ phép cuối năm',
+        status: 'pending',
+        createdAt: '2023-12-14T09:00:00Z',
+        updatedAt: '2023-12-14T09:00:00Z',
+        daysCount: 3,
+      },
+      // Approved leaves for calendar
+      {
+        id: 'leave-006',
+        userId: 'user-005',
+        startDate: '2023-12-18',
+        endDate: '2023-12-19',
+        leaveType: 'annual',
+        reason: 'Việc cá nhân',
+        status: 'approved',
+        approverId: 'user-002',
+        approverName: 'Trần Thị B',
+        approvedAt: '2023-12-11T10:00:00Z',
+        createdAt: '2023-12-10T08:00:00Z',
+        updatedAt: '2023-12-11T10:00:00Z',
+        daysCount: 2,
+      },
     ];
 
     StorageService.set('leave_requests', requests);
+  }
+
+  private static seedOvertimeRequests(): void {
+    const requests: OvertimeRequest[] = [
+      {
+        id: 'ot-001',
+        userId: 'user-001',
+        date: '2023-12-16',
+        startTime: '18:00',
+        endTime: '21:00',
+        reason: 'Hoàn thành deadline dự án',
+        status: 'pending',
+        createdAt: '2023-12-14T15:00:00Z',
+        hoursCount: 3,
+      },
+      {
+        id: 'ot-002',
+        userId: 'user-004',
+        date: '2023-12-17',
+        startTime: '09:00',
+        endTime: '14:00',
+        reason: 'Fix bug khẩn cấp',
+        status: 'pending',
+        createdAt: '2023-12-15T08:00:00Z',
+        hoursCount: 5,
+      },
+      {
+        id: 'ot-003',
+        userId: 'user-006',
+        date: '2023-12-18',
+        startTime: '18:00',
+        endTime: '20:00',
+        reason: 'Testing release mới',
+        status: 'pending',
+        createdAt: '2023-12-15T10:00:00Z',
+        hoursCount: 2,
+      },
+      // Approved OT for calendar
+      {
+        id: 'ot-004',
+        userId: 'user-001',
+        date: '2023-12-15',
+        startTime: '18:00',
+        endTime: '22:00',
+        reason: 'Deploy production',
+        status: 'approved',
+        approverId: 'user-002',
+        approverName: 'Trần Thị B',
+        approvedAt: '2023-12-14T09:00:00Z',
+        createdAt: '2023-12-13T16:00:00Z',
+        hoursCount: 4,
+      },
+    ];
+
+    StorageService.set('overtime_requests', requests);
   }
 
   private static seedPayslips(): void {
@@ -236,6 +428,7 @@ export class SeedService {
     StorageService.remove('users');
     StorageService.remove('leave_balances');
     StorageService.remove('leave_requests');
+    StorageService.remove('overtime_requests');
     StorageService.remove('payslips');
     StorageService.remove('notifications');
     StorageService.remove('current_user');
