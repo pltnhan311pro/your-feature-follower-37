@@ -1,39 +1,111 @@
-// Authentication Service - manages user login/logout and current session
+// Authentication Service - manages user login/logout using Supabase Auth
+// Maps to localStorage key: hr_portal_current_user
 import { User, UserRole } from '@/types';
-import { StorageService } from './StorageService';
-import { UserService } from './UserService';
+import { supabase } from '@/integrations/supabase/client';
+import { Session } from '@supabase/supabase-js';
 
-const CURRENT_USER_KEY = 'current_user';
+// Helper to convert DB profile to User type
+const mapProfileToUser = (profile: any): User => ({
+  id: profile.id,
+  employeeId: profile.employee_id,
+  fullName: profile.full_name,
+  email: profile.email,
+  phone: profile.phone || '',
+  avatar: profile.avatar,
+  role: profile.role as UserRole,
+  department: profile.department,
+  position: profile.position,
+  location: profile.location || '',
+  startDate: profile.start_date,
+  contractType: profile.contract_type || '',
+  managerId: profile.manager_id,
+  managerName: profile.manager?.full_name,
+  baseSalary: Number(profile.base_salary) || 0,
+  status: profile.status as User['status'],
+  idNumber: profile.id_number || '',
+});
 
 export class AuthService {
-  static getCurrentUser(): User | null {
-    return StorageService.get<User>(CURRENT_USER_KEY);
+  private static currentUser: User | null = null;
+  private static session: Session | null = null;
+
+  static async initialize(): Promise<void> {
+    // Get current session
+    const { data: { session } } = await supabase.auth.getSession();
+    this.session = session;
+    
+    if (session?.user) {
+      await this.loadUserProfile(session.user.id);
+    }
   }
 
-  static login(identifier: string, password: string): User | null {
-    // In a real app, this would validate against a backend
-    // Support login by employeeId or email
-    let user = UserService.getByEmployeeId(identifier);
+  static async loadUserProfile(userId: string): Promise<User | null> {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*, manager:manager_id(full_name)')
+      .eq('id', userId)
+      .maybeSingle();
     
-    // If not found by employeeId, try by email
-    if (!user) {
-      user = UserService.getByEmail(identifier);
+    if (error || !data) {
+      console.error('Error loading user profile:', error);
+      return null;
     }
     
-    if (user && user.status !== 'inactive' && password === '123456') { // Simple password for demo
-      StorageService.set(CURRENT_USER_KEY, user);
+    this.currentUser = mapProfileToUser(data);
+    return this.currentUser;
+  }
+
+  static getCurrentUser(): User | null {
+    return this.currentUser;
+  }
+
+  static getSession(): Session | null {
+    return this.session;
+  }
+
+  static setCurrentUser(user: User | null): void {
+    this.currentUser = user;
+  }
+
+  static setSession(session: Session | null): void {
+    this.session = session;
+  }
+
+  static async login(email: string, password: string): Promise<User | null> {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    if (error) {
+      console.error('Login error:', error.message);
+      return null;
+    }
+
+    if (data.user) {
+      this.session = data.session;
+      const user = await this.loadUserProfile(data.user.id);
+      
+      // Check if user is inactive
+      if (user && user.status === 'inactive') {
+        await this.logout();
+        return null;
+      }
+      
       return user;
     }
-    
+
     return null;
   }
 
-  static logout(): void {
-    StorageService.remove(CURRENT_USER_KEY);
+  static async logout(): Promise<void> {
+    await supabase.auth.signOut();
+    this.currentUser = null;
+    this.session = null;
   }
 
   static isAuthenticated(): boolean {
-    return this.getCurrentUser() !== null;
+    return this.currentUser !== null && this.session !== null;
   }
 
   static hasRole(requiredRole: UserRole): boolean {
@@ -57,12 +129,30 @@ export class AuthService {
     return this.hasRole('admin');
   }
 
-  static updateCurrentUser(updates: Partial<User>): User | null {
+  static async updateCurrentUser(updates: Partial<User>): Promise<User | null> {
     const user = this.getCurrentUser();
     if (!user) return null;
 
-    const updatedUser = { ...user, ...updates };
-    StorageService.set(CURRENT_USER_KEY, updatedUser);
-    return updatedUser;
+    // Update profile in database
+    const dbUpdates: any = {};
+    if (updates.fullName !== undefined) dbUpdates.full_name = updates.fullName;
+    if (updates.phone !== undefined) dbUpdates.phone = updates.phone;
+    if (updates.avatar !== undefined) dbUpdates.avatar = updates.avatar;
+    if (updates.location !== undefined) dbUpdates.location = updates.location;
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .update(dbUpdates)
+      .eq('id', user.id)
+      .select('*, manager:manager_id(full_name)')
+      .single();
+
+    if (error) {
+      console.error('Error updating profile:', error);
+      return null;
+    }
+
+    this.currentUser = mapProfileToUser(data);
+    return this.currentUser;
   }
 }

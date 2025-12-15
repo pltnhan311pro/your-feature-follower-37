@@ -1,53 +1,149 @@
-// Payslip Service - manages payslip CRUD operations
+// Payslip Service - manages payslip CRUD operations (Supabase version)
+// Maps to localStorage key: hr_portal_payslips
 import { Payslip } from '@/types';
-import { StorageService } from './StorageService';
+import { supabase } from '@/integrations/supabase/client';
 
-const PAYSLIPS_KEY = 'payslips';
+// Helper to convert DB row to Payslip
+const mapDbToPayslip = (row: any): Payslip => ({
+  id: row.id,
+  userId: row.user_id,
+  period: row.period,
+  periodLabel: row.period_label,
+  baseSalary: Number(row.base_salary),
+  overtime: Number(row.overtime),
+  bonus: Number(row.bonus),
+  allowances: Number(row.allowances),
+  socialInsurance: Number(row.social_insurance),
+  healthInsurance: Number(row.health_insurance),
+  tax: Number(row.tax),
+  deductions: Number(row.deductions),
+  netSalary: Number(row.net_salary),
+  status: row.status as Payslip['status'],
+  paidDate: row.paid_date,
+  createdAt: row.created_at,
+});
 
 export class PayslipService {
-  static getAll(): Payslip[] {
-    return StorageService.getAll<Payslip>(PAYSLIPS_KEY);
+  static async getAll(): Promise<Payslip[]> {
+    const { data, error } = await supabase
+      .from('payslips')
+      .select('*')
+      .order('period', { ascending: false });
+    
+    if (error) {
+      console.error('Error fetching payslips:', error);
+      return [];
+    }
+    return (data || []).map(mapDbToPayslip);
   }
 
-  static getById(id: string): Payslip | null {
-    return StorageService.findById<Payslip>(PAYSLIPS_KEY, id);
+  static async getById(id: string): Promise<Payslip | null> {
+    const { data, error } = await supabase
+      .from('payslips')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+    
+    if (error || !data) return null;
+    return mapDbToPayslip(data);
   }
 
-  static getByUserId(userId: string): Payslip[] {
-    const payslips = StorageService.findByField<Payslip>(PAYSLIPS_KEY, 'userId', userId);
-    return payslips.sort((a, b) => b.period.localeCompare(a.period));
+  static async getByUserId(userId: string): Promise<Payslip[]> {
+    const { data, error } = await supabase
+      .from('payslips')
+      .select('*')
+      .eq('user_id', userId)
+      .order('period', { ascending: false });
+    
+    if (error) return [];
+    return (data || []).map(mapDbToPayslip);
   }
 
-  static getLatestByUserId(userId: string): Payslip | null {
-    const payslips = this.getByUserId(userId);
+  static async getLatestByUserId(userId: string): Promise<Payslip | null> {
+    const payslips = await this.getByUserId(userId);
     return payslips[0] || null;
   }
 
-  static create(data: Omit<Payslip, 'id' | 'createdAt'>): Payslip {
-    const payslip: Payslip = {
-      ...data,
-      id: crypto.randomUUID(),
-      createdAt: new Date().toISOString(),
-    };
-    StorageService.addItem(PAYSLIPS_KEY, payslip);
-    return payslip;
+  static async create(data: Omit<Payslip, 'id' | 'createdAt'>): Promise<Payslip | null> {
+    const { data: inserted, error } = await supabase
+      .from('payslips')
+      .insert({
+        user_id: data.userId,
+        period: data.period,
+        period_label: data.periodLabel,
+        base_salary: data.baseSalary,
+        overtime: data.overtime,
+        bonus: data.bonus,
+        allowances: data.allowances,
+        social_insurance: data.socialInsurance,
+        health_insurance: data.healthInsurance,
+        tax: data.tax,
+        deductions: data.deductions,
+        net_salary: data.netSalary,
+        status: data.status,
+        paid_date: data.paidDate,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error creating payslip:', error);
+      return null;
+    }
+    return mapDbToPayslip(inserted);
   }
 
-  static update(id: string, updates: Partial<Payslip>): Payslip | null {
-    return StorageService.updateItem<Payslip>(PAYSLIPS_KEY, id, updates);
+  static async update(id: string, updates: Partial<Payslip>): Promise<Payslip | null> {
+    const dbUpdates: any = {};
+    if (updates.baseSalary !== undefined) dbUpdates.base_salary = updates.baseSalary;
+    if (updates.overtime !== undefined) dbUpdates.overtime = updates.overtime;
+    if (updates.bonus !== undefined) dbUpdates.bonus = updates.bonus;
+    if (updates.allowances !== undefined) dbUpdates.allowances = updates.allowances;
+    if (updates.socialInsurance !== undefined) dbUpdates.social_insurance = updates.socialInsurance;
+    if (updates.healthInsurance !== undefined) dbUpdates.health_insurance = updates.healthInsurance;
+    if (updates.tax !== undefined) dbUpdates.tax = updates.tax;
+    if (updates.deductions !== undefined) dbUpdates.deductions = updates.deductions;
+    if (updates.netSalary !== undefined) dbUpdates.net_salary = updates.netSalary;
+    if (updates.status !== undefined) dbUpdates.status = updates.status;
+    if (updates.paidDate !== undefined) dbUpdates.paid_date = updates.paidDate;
+
+    const { data, error } = await supabase
+      .from('payslips')
+      .update(dbUpdates)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating payslip:', error);
+      return null;
+    }
+    return mapDbToPayslip(data);
   }
 
-  static delete(id: string): boolean {
-    return StorageService.deleteItem<Payslip>(PAYSLIPS_KEY, id);
+  static async delete(id: string): Promise<boolean> {
+    const { error } = await supabase
+      .from('payslips')
+      .delete()
+      .eq('id', id);
+    
+    return !error;
   }
 
-  static getByPeriod(userId: string, period: string): Payslip | null {
-    const payslips = this.getByUserId(userId);
-    return payslips.find(p => p.period === period) || null;
+  static async getByPeriod(userId: string, period: string): Promise<Payslip | null> {
+    const { data, error } = await supabase
+      .from('payslips')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('period', period)
+      .maybeSingle();
+    
+    if (error || !data) return null;
+    return mapDbToPayslip(data);
   }
 
-  static compareWithPrevious(payslip: Payslip): { field: string; current: number; previous: number; diff: number }[] {
-    const allPayslips = this.getByUserId(payslip.userId);
+  static async compareWithPrevious(payslip: Payslip): Promise<{ field: string; current: number; previous: number; diff: number }[]> {
+    const allPayslips = await this.getByUserId(payslip.userId);
     const currentIndex = allPayslips.findIndex(p => p.id === payslip.id);
     
     if (currentIndex === -1 || currentIndex >= allPayslips.length - 1) {
@@ -65,8 +161,6 @@ export class PayslipService {
   }
 
   static generatePDF(payslip: Payslip): void {
-    // In a real app, this would generate an actual PDF
-    // For now, we'll create a simple text representation
     const content = `
 PHIẾU LƯƠNG - ${payslip.periodLabel}
 ================================

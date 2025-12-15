@@ -1,13 +1,13 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { User } from '@/types';
 import { AuthService } from '@/services/AuthService';
-import { SeedService } from '@/services/SeedService';
+import { supabase } from '@/integrations/supabase/client';
 
 interface AuthContextType {
   user: User | null;
-  login: (employeeId: string, password: string) => boolean;
-  logout: () => void;
-  updateUser: (updates: Partial<User>) => void;
+  login: (email: string, password: string) => Promise<boolean>;
+  logout: () => Promise<void>;
+  updateUser: (updates: Partial<User>) => Promise<void>;
   isLoading: boolean;
 }
 
@@ -18,17 +18,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Seed demo data on first load
-    SeedService.seedIfNeeded();
-    
-    // Check for existing session
-    const currentUser = AuthService.getCurrentUser();
-    setUser(currentUser);
-    setIsLoading(false);
+    // Set up auth state listener FIRST
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        AuthService.setSession(session);
+        if (session?.user) {
+          // Defer profile loading to avoid deadlock
+          setTimeout(async () => {
+            const profile = await AuthService.loadUserProfile(session.user.id);
+            setUser(profile);
+            setIsLoading(false);
+          }, 0);
+        } else {
+          AuthService.setCurrentUser(null);
+          setUser(null);
+          setIsLoading(false);
+        }
+      }
+    );
+
+    // THEN check for existing session
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      AuthService.setSession(session);
+      if (session?.user) {
+        const profile = await AuthService.loadUserProfile(session.user.id);
+        setUser(profile);
+      }
+      setIsLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
-  const login = (employeeId: string, password: string): boolean => {
-    const loggedInUser = AuthService.login(employeeId, password);
+  const login = async (email: string, password: string): Promise<boolean> => {
+    const loggedInUser = await AuthService.login(email, password);
     if (loggedInUser) {
       setUser(loggedInUser);
       return true;
@@ -36,13 +59,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return false;
   };
 
-  const logout = () => {
-    AuthService.logout();
+  const logout = async () => {
+    await AuthService.logout();
     setUser(null);
   };
 
-  const updateUser = (updates: Partial<User>) => {
-    const updatedUser = AuthService.updateCurrentUser(updates);
+  const updateUser = async (updates: Partial<User>) => {
+    const updatedUser = await AuthService.updateCurrentUser(updates);
     if (updatedUser) {
       setUser(updatedUser);
     }
