@@ -1,5 +1,5 @@
 import { NavLink, useLocation } from 'react-router-dom';
-import { Home, User, Calendar, Gift, Clock, FileText, Settings, LogOut, CheckCircle, Users, History, ClipboardCheck } from 'lucide-react';
+import { Home, User, Calendar, Gift, Clock, FileText, Settings, LogOut, CheckCircle, Users, History, ClipboardCheck, Shield, UserCog, Wallet } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -18,6 +18,12 @@ const managerMenuItems = [
   { path: '/manager/approvals', icon: ClipboardCheck, label: 'Duyệt đơn' },
   { path: '/manager/history', icon: History, label: 'Lịch sử duyệt' },
   { path: '/manager/team', icon: Users, label: 'Danh sách team' },
+];
+
+const adminMenuItems = [
+  { path: '/admin', icon: Shield, label: 'HR Dashboard' },
+  { path: '/admin/employees', icon: UserCog, label: 'Quản lý nhân viên' },
+  { path: '/admin/payroll', icon: Wallet, label: 'Quản lý lương' },
 ];
 
 export function Sidebar() {
@@ -75,6 +81,33 @@ export function Sidebar() {
                 Quản lý
               </p>
               {managerMenuItems.map((item) => {
+                const isActive = location.pathname === item.path;
+                return (
+                  <NavLink
+                    key={item.path}
+                    to={item.path}
+                    className={cn(
+                      'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
+                      isActive
+                        ? 'bg-sidebar-accent text-sidebar-accent-foreground'
+                        : 'text-sidebar-foreground hover:bg-sidebar-accent/50'
+                    )}
+                  >
+                    <item.icon className={cn('h-5 w-5', isActive && 'text-primary')} />
+                    {item.label}
+                </NavLink>
+              );
+            })}
+            </>
+          )}
+
+          {/* Admin Menu */}
+          {user && user.role === 'admin' && (
+            <>
+              <p className="mt-6 mb-2 px-3 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                HR Admin
+              </p>
+              {adminMenuItems.map((item) => {
                 const isActive = location.pathname === item.path;
                 return (
                   <NavLink

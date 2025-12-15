@@ -15,6 +15,9 @@ import ManagerDashboard from "./pages/ManagerDashboard";
 import PendingApprovals from "./pages/PendingApprovals";
 import ApprovalHistory from "./pages/ApprovalHistory";
 import TeamMembers from "./pages/TeamMembers";
+import HRDashboard from "./pages/admin/HRDashboard";
+import EmployeeManagement from "./pages/admin/EmployeeManagement";
+import PayrollManagement from "./pages/admin/PayrollManagement";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -51,6 +54,24 @@ function ManagerRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function AdminRoute({ children }: { children: React.ReactNode }) {
+  const { user, isLoading } = useAuth();
+  
+  if (isLoading) {
+    return <div className="min-h-screen flex items-center justify-center">Loading...</div>;
+  }
+  
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+  
+  if (user.role !== 'admin') {
+    return <Navigate to="/" replace />;
+  }
+  
+  return <>{children}</>;
+}
+
 function AppRoutes() {
   const { user } = useAuth();
   
@@ -68,6 +89,10 @@ function AppRoutes() {
       <Route path="/manager/approvals" element={<ManagerRoute><PendingApprovals /></ManagerRoute>} />
       <Route path="/manager/history" element={<ManagerRoute><ApprovalHistory /></ManagerRoute>} />
       <Route path="/manager/team" element={<ManagerRoute><TeamMembers /></ManagerRoute>} />
+      {/* Admin Routes */}
+      <Route path="/admin" element={<AdminRoute><HRDashboard /></AdminRoute>} />
+      <Route path="/admin/employees" element={<AdminRoute><EmployeeManagement /></AdminRoute>} />
+      <Route path="/admin/payroll" element={<AdminRoute><PayrollManagement /></AdminRoute>} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
