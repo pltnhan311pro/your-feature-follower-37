@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { useAuth } from '@/contexts/AuthContext';
 import { PayslipService } from '@/services/PayslipService';
@@ -27,21 +27,47 @@ import { Payslip } from '@/types';
 
 export default function Payroll() {
   const { user } = useAuth();
-  const payslips = user ? PayslipService.getByUserId(user.id) : [];
-  const [selectedPayslip, setSelectedPayslip] = useState<Payslip | null>(
-    payslips[0] || null
-  );
+  const [payslips, setPayslips] = useState<Payslip[]>([]);
+  const [selectedPayslip, setSelectedPayslip] = useState<Payslip | null>(null);
+  const [comparison, setComparison] = useState<{ field: string; current: number; previous: number; diff: number }[]>([]);
   const [showComparison, setShowComparison] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadData = async () => {
+      if (!user) return;
+      try {
+        const data = await PayslipService.getByUserId(user.id);
+        setPayslips(data);
+        if (data.length > 0) {
+          setSelectedPayslip(data[0]);
+        }
+      } catch (error) {
+        console.error('Error loading payroll data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, [user]);
+
+  useEffect(() => {
+    const loadComparison = async () => {
+      if (!selectedPayslip) {
+        setComparison([]);
+        return;
+      }
+      const comp = await PayslipService.compareWithPrevious(selectedPayslip);
+      setComparison(comp);
+    };
+    loadComparison();
+  }, [selectedPayslip]);
 
   if (!user) return null;
 
-  const comparison = selectedPayslip 
-    ? PayslipService.compareWithPrevious(selectedPayslip) 
-    : [];
-
-  const handleDownload = () => {
+  const handleDownload = async () => {
     if (selectedPayslip) {
-      PayslipService.generatePDF(selectedPayslip);
+      await PayslipService.generatePDF(selectedPayslip);
       toast.success('Đã tải phiếu lương');
     }
   };

@@ -26,16 +26,22 @@ export function Header({ breadcrumbs, title, subtitle }: HeaderProps) {
   const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
-    if (user) {
-      const userNotifications = NotificationService.getByUserId(user.id);
-      setNotifications(userNotifications.slice(0, 5));
-      setUnreadCount(NotificationService.getUnreadCount(user.id));
-    }
+    const loadNotifications = async () => {
+      if (user) {
+        const [userNotifications, count] = await Promise.all([
+          NotificationService.getByUserId(user.id),
+          NotificationService.getUnreadCount(user.id),
+        ]);
+        setNotifications(userNotifications.slice(0, 5));
+        setUnreadCount(count);
+      }
+    };
+    loadNotifications();
   }, [user]);
 
-  const handleMarkAllRead = () => {
+  const handleMarkAllRead = async () => {
     if (user) {
-      NotificationService.markAllAsRead(user.id);
+      await NotificationService.markAllAsRead(user.id);
       setUnreadCount(0);
       setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
     }

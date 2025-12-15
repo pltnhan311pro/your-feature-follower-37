@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserService } from '@/services/UserService';
@@ -45,7 +45,7 @@ import {
   Trash2
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { LeaveRequest, LeaveType } from '@/types';
+import { LeaveRequest, LeaveType, LeaveBalance } from '@/types';
 
 export default function Leave() {
   const { user } = useAuth();
@@ -56,13 +56,31 @@ export default function Leave() {
   const [endDate, setEndDate] = useState('');
   const [leaveType, setLeaveType] = useState<LeaveType>('annual');
   const [reason, setReason] = useState('');
-  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>(
-    user ? LeaveService.getByUserId(user.id) : []
-  );
+  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
+  const [leaveBalance, setLeaveBalance] = useState<LeaveBalance | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadData = async () => {
+      if (!user) return;
+      try {
+        const [requests, balance] = await Promise.all([
+          LeaveService.getByUserId(user.id),
+          UserService.getLeaveBalance(user.id),
+        ]);
+        setLeaveRequests(requests);
+        setLeaveBalance(balance);
+      } catch (error) {
+        console.error('Error loading leave data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, [user]);
 
   if (!user) return null;
 
-  const leaveBalance = UserService.getLeaveBalance(user.id);
   const remainingAnnual = leaveBalance 
     ? leaveBalance.annualTotal - leaveBalance.annualUsed 
     : 0;
@@ -78,7 +96,7 @@ export default function Leave() {
     setEditingRequest(null);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!startDate || !endDate || !reason) {
       toast.error('Vui lòng điền đầy đủ thông tin');
       return;
@@ -90,12 +108,12 @@ export default function Leave() {
     }
 
     // Check team conflict
-    const conflictCount = LeaveService.checkTeamLeaveConflict(user.id, startDate, endDate);
+    const conflictCount = await LeaveService.checkTeamLeaveConflict(user.id, startDate, endDate);
     if (conflictCount >= 2) {
       toast.warning(`Lưu ý: Có ${conflictCount} người trong team đã nghỉ trong khoảng thời gian này`);
     }
 
-    const result = LeaveService.create({
+    const result = await LeaveService.create({
       userId: user.id,
       startDate,
       endDate,
@@ -104,11 +122,12 @@ export default function Leave() {
     });
 
     if ('error' in result) {
-      toast.error(result.error);
+      toast.error(result.error as string);
       return;
     }
 
-    setLeaveRequests(LeaveService.getByUserId(user.id));
+    const updatedRequests = await LeaveService.getByUserId(user.id);
+    setLeaveRequests(updatedRequests);
     setIsDialogOpen(false);
     resetForm();
     toast.success('Đã gửi đơn xin nghỉ phép');
@@ -123,7 +142,7 @@ export default function Leave() {
     setIsEditDialogOpen(true);
   };
 
-  const handleUpdateSubmit = () => {
+  const handleUpdateSubmit = async () => {
     if (!editingRequest) return;
     if (!startDate || !endDate || !reason) {
       toast.error('Vui lòng điền đầy đủ thông tin');
@@ -137,7 +156,7 @@ export default function Leave() {
 
     const daysCount = LeaveService.calculateDays(startDate, endDate);
     
-    LeaveService.update(editingRequest.id, {
+    await LeaveService.update(editingRequest.id, {
       startDate,
       endDate,
       leaveType,
@@ -145,15 +164,17 @@ export default function Leave() {
       daysCount,
     });
 
-    setLeaveRequests(LeaveService.getByUserId(user.id));
+    const updatedRequests = await LeaveService.getByUserId(user.id);
+    setLeaveRequests(updatedRequests);
     setIsEditDialogOpen(false);
     resetForm();
     toast.success('Đã cập nhật đơn nghỉ phép');
   };
 
-  const handleDelete = (requestId: string) => {
-    LeaveService.delete(requestId);
-    setLeaveRequests(LeaveService.getByUserId(user.id));
+  const handleDelete = async (requestId: string) => {
+    await LeaveService.delete(requestId);
+    const updatedRequests = await LeaveService.getByUserId(user.id);
+    setLeaveRequests(updatedRequests);
     toast.success('Đã xóa đơn nghỉ phép');
   };
 
@@ -463,8 +484,8 @@ export default function Leave() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="annual">Phép năm ({remainingAnnual} ngày còn lại)</SelectItem>
-                    <SelectItem value="sick">Nghỉ ốm ({remainingSick} ngày còn lại)</SelectItem>
+                    <SelectItem value="annual">Phép năm</SelectItem>
+                    <SelectItem value="sick">Nghỉ ốm</SelectItem>
                     <SelectItem value="unpaid">Không lương</SelectItem>
                   </SelectContent>
                 </Select>

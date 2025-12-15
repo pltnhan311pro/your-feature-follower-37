@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserService } from '@/services/UserService';
@@ -19,23 +19,39 @@ import {
   MapPin,
   Briefcase,
   Building,
-  Calendar,
   FileText,
   X,
   Check
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
+import { Payslip } from '@/types';
 
 export default function Profile() {
   const { user, updateUser } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [email, setEmail] = useState(user?.email || '');
   const [phone, setPhone] = useState(user?.phone || '');
+  const [payslips, setPayslips] = useState<Payslip[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadData = async () => {
+      if (!user) return;
+      try {
+        const data = await PayslipService.getByUserId(user.id);
+        setPayslips(data.slice(0, 3));
+      } catch (error) {
+        console.error('Error loading payslips:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, [user]);
 
   if (!user) return null;
 
-  const payslips = PayslipService.getByUserId(user.id).slice(0, 3);
   const nextPayDate = '30/11';
 
   const getInitials = (name: string) => {
@@ -47,7 +63,7 @@ export default function Profile() {
       .slice(0, 2);
   };
 
-  const handleSaveContact = () => {
+  const handleSaveContact = async () => {
     // Validate email
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
@@ -63,7 +79,7 @@ export default function Profile() {
     }
 
     // Update user
-    UserService.update(user.id, { email, phone });
+    await UserService.update(user.id, { email, phone });
     updateUser({ email, phone });
     
     setIsEditing(false);
@@ -76,10 +92,10 @@ export default function Profile() {
     setIsEditing(false);
   };
 
-  const handleDownloadPayslip = (payslipId: string) => {
-    const payslip = PayslipService.getById(payslipId);
+  const handleDownloadPayslip = async (payslipId: string) => {
+    const payslip = await PayslipService.getById(payslipId);
     if (payslip) {
-      PayslipService.generatePDF(payslip);
+      await PayslipService.generatePDF(payslip);
       toast.success('Đã tải phiếu lương');
     }
   };

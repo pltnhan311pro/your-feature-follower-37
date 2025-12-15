@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { useAuth } from '@/contexts/AuthContext';
 import { UserService } from '@/services/UserService';
@@ -15,16 +16,39 @@ import {
   Wallet
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { LeaveBalance, LeaveRequest, Payslip } from '@/types';
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const [leaveBalance, setLeaveBalance] = useState<LeaveBalance | null>(null);
+  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
+  const [latestPayslip, setLatestPayslip] = useState<Payslip | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadData = async () => {
+      if (!user) return;
+      try {
+        const [balance, requests, payslip] = await Promise.all([
+          UserService.getLeaveBalance(user.id),
+          LeaveService.getByUserId(user.id),
+          PayslipService.getLatestByUserId(user.id),
+        ]);
+        setLeaveBalance(balance);
+        setLeaveRequests(requests);
+        setLatestPayslip(payslip);
+      } catch (error) {
+        console.error('Error loading dashboard data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, [user]);
 
   if (!user) return null;
 
-  const leaveBalance = UserService.getLeaveBalance(user.id);
-  const pendingLeaves = LeaveService.getByUserId(user.id).filter(l => l.status === 'pending');
-  const latestPayslip = PayslipService.getLatestByUserId(user.id);
-
+  const pendingLeaves = leaveRequests.filter(l => l.status === 'pending');
   const remainingAnnual = leaveBalance 
     ? leaveBalance.annualTotal - leaveBalance.annualUsed 
     : 0;
@@ -161,9 +185,9 @@ export default function Dashboard() {
               </Link>
             </CardHeader>
             <CardContent>
-              {pendingLeaves.length > 0 || LeaveService.getByUserId(user.id).length > 0 ? (
+              {leaveRequests.length > 0 ? (
                 <div className="space-y-3">
-                  {LeaveService.getByUserId(user.id).slice(0, 3).map((leave) => (
+                  {leaveRequests.slice(0, 3).map((leave) => (
                     <div key={leave.id} className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
                       <div>
                         <p className="font-medium text-sm">

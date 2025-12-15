@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -41,10 +41,23 @@ export default function Overtime() {
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
   const [reason, setReason] = useState('');
-  
-  const [otRequests, setOtRequests] = useState<OvertimeRequest[]>(
-    user ? OvertimeService.getByUserId(user.id) : []
-  );
+  const [otRequests, setOtRequests] = useState<OvertimeRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadData = async () => {
+      if (!user) return;
+      try {
+        const requests = await OvertimeService.getByUserId(user.id);
+        setOtRequests(requests);
+      } catch (error) {
+        console.error('Error loading overtime data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, [user]);
 
   if (!user) return null;
 
@@ -64,7 +77,7 @@ export default function Overtime() {
     setEditingRequest(null);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!date || !startTime || !endTime || !reason) {
       toast.error('Vui lòng điền đầy đủ thông tin');
       return;
@@ -76,7 +89,7 @@ export default function Overtime() {
       return;
     }
 
-    const result = OvertimeService.create({
+    const result = await OvertimeService.create({
       userId: user.id,
       date,
       startTime,
@@ -85,11 +98,12 @@ export default function Overtime() {
     });
 
     if ('error' in result) {
-      toast.error(result.error);
+      toast.error(result.error as string);
       return;
     }
 
-    setOtRequests(OvertimeService.getByUserId(user.id));
+    const updatedRequests = await OvertimeService.getByUserId(user.id);
+    setOtRequests(updatedRequests);
     setIsDialogOpen(false);
     resetForm();
     toast.success('Đã gửi đơn đăng ký OT');
@@ -104,7 +118,7 @@ export default function Overtime() {
     setIsEditDialogOpen(true);
   };
 
-  const handleUpdateSubmit = () => {
+  const handleUpdateSubmit = async () => {
     if (!editingRequest) return;
     if (!date || !startTime || !endTime || !reason) {
       toast.error('Vui lòng điền đầy đủ thông tin');
@@ -117,7 +131,7 @@ export default function Overtime() {
       return;
     }
 
-    OvertimeService.update(editingRequest.id, {
+    await OvertimeService.update(editingRequest.id, {
       date,
       startTime,
       endTime,
@@ -125,15 +139,17 @@ export default function Overtime() {
       hoursCount: hours,
     });
 
-    setOtRequests(OvertimeService.getByUserId(user.id));
+    const updatedRequests = await OvertimeService.getByUserId(user.id);
+    setOtRequests(updatedRequests);
     setIsEditDialogOpen(false);
     resetForm();
     toast.success('Đã cập nhật đơn OT');
   };
 
-  const handleDelete = (requestId: string) => {
-    OvertimeService.delete(requestId);
-    setOtRequests(OvertimeService.getByUserId(user.id));
+  const handleDelete = async (requestId: string) => {
+    await OvertimeService.delete(requestId);
+    const updatedRequests = await OvertimeService.getByUserId(user.id);
+    setOtRequests(updatedRequests);
     toast.success('Đã xóa đơn OT');
   };
 
